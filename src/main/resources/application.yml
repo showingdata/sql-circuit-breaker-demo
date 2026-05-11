@@ -78,7 +78,7 @@ management:
         include: prometheus, metrics
 logging:
   level:
-    com.xw.tmp: DEBUG
+    io.github.showingdata.sql.circuit.breaker: INFO
     org.mybatis.spring: WARN
 
 
