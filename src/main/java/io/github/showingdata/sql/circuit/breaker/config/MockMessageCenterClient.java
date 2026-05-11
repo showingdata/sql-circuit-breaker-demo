@@ -1,4 +1,4 @@
-package com.xw.tmp.demo.config;
+package io.github.showingdata.sql.circuit.breaker.config;
 
 import io.github.showingdata.starter.framework.circuitbreaker.CircuitBreakerEvent;
 import io.github.showingdata.starter.framework.circuitbreaker.message.MessageCenterClient;

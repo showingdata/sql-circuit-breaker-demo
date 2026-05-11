@@ -1,8 +1,8 @@
-package com.xw.tmp.demo.mapper;
+package io.github.showingdata.sql.circuit.breaker.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.xw.tmp.demo.entity.Order;
+import io.github.showingdata.sql.circuit.breaker.entity.Order;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 

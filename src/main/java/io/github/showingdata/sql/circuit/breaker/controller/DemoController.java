@@ -1,8 +1,8 @@
-package com.xw.tmp.demo.controller;
+package io.github.showingdata.sql.circuit.breaker.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.xw.tmp.demo.entity.Order;
-import com.xw.tmp.demo.service.OrderService;
+import io.github.showingdata.sql.circuit.breaker.entity.Order;
+import io.github.showingdata.sql.circuit.breaker.service.OrderService;
 import io.github.showingdata.starter.framework.circuitbreaker.SqlCircuitBreakerException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

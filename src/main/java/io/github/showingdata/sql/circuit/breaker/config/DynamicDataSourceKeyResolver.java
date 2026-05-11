@@ -1,4 +1,4 @@
-package com.xw.tmp.demo.config;
+package io.github.showingdata.sql.circuit.breaker.config;
 
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import io.github.showingdata.starter.framework.circuitbreaker.datasource.DataSourceKeyResolver;
@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 /**
  * @author chenjiang
  * @date 2026/5/7 10:27
- * @package com.xw.tmp.demo.config
  * @className DynamicDataSourceKeyResolver
  * @description
  */

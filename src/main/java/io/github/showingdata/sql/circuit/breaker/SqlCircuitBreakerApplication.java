@@ -1,4 +1,4 @@
-package com.xw.tmp.demo;
+package io.github.showingdata.sql.circuit.breaker;
 
 import lombok.extern.slf4j.Slf4j;
 import org.mybatis.spring.annotation.MapperScan;
@@ -7,10 +7,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @Slf4j
 @SpringBootApplication
-@MapperScan("com.xw.tmp.demo.mapper")
-public class DemoApplication {
+@MapperScan("io.github.showingdata.sql.circuit.breaker.mapper")
+public class SqlCircuitBreakerApplication {
     public static void main(String[] args) {
-        SpringApplication.run(DemoApplication.class, args);
+        SpringApplication.run(SqlCircuitBreakerApplication.class, args);
         log.info("启动完成");
     }
 }

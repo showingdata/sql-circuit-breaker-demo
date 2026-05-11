@@ -1,4 +1,4 @@
-package com.xw.tmp.demo.config;
+package io.github.showingdata.sql.circuit.breaker.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;

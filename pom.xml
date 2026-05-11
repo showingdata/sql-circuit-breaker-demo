@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.xw.tmp.demo</groupId>
+    <groupId>io.github.showingdata.sql.circuit.breaker</groupId>
     <artifactId>sql-circuit-breaker-demo</artifactId>
     <version>1.0.0</version>
     <name>sql-circuit-breaker-demo</name>

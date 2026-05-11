@@ -1,4 +1,4 @@
-package com.xw.tmp.demo.entity;
+package io.github.showingdata.sql.circuit.breaker.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

@@ -1,14 +1,13 @@
-package com.xw.tmp.demo.service;
+package io.github.showingdata.sql.circuit.breaker.service;
 
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.xw.tmp.demo.entity.Order;
-import com.xw.tmp.demo.mapper.OrderMapper;
+import io.github.showingdata.sql.circuit.breaker.entity.Order;
+import io.github.showingdata.sql.circuit.breaker.mapper.OrderMapper;
 import io.github.showingdata.starter.framework.circuitbreaker.context.SqlCircuitBreakerContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
