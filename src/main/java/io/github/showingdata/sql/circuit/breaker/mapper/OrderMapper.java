@@ -3,6 +3,7 @@ package io.github.showingdata.sql.circuit.breaker.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.showingdata.sql.circuit.breaker.entity.Order;
+import io.github.showingdata.starter.framework.circuitbreaker.annotation.SqlCircuitBreaker;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -50,6 +51,6 @@ public interface OrderMapper extends BaseMapper<Order> {
      * 方法级注解将 SELECT 超时放宽为 5s（接口级默认 3s），演示注解优先级。
      */
     @Select("SELECT * FROM t_order WHERE (#{status} IS NULL OR status = #{status}) ORDER BY create_time DESC")
-    //@SqlCircuitBreaker(timeoutMs = 1, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
+    @SqlCircuitBreaker(timeoutMs = 1, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
     IPage<Order> selectPageByStatus(IPage<Order> page, @Param("status") Integer status);
 }

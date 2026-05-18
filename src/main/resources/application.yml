@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8082
 spring:
   application:
     name: circuit-breaker-demo
@@ -77,9 +77,10 @@ management:
       exposure:
         include: prometheus, metrics
 logging:
+  path: ./logs
   level:
     io.github.showingdata.sql.circuit.breaker: INFO
-    org.mybatis.spring: WARN
+    org.mybatis.spring: INFO
 
 
 

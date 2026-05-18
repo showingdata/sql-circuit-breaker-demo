@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false">
+
+	<springProperty scope="context" name="LOG_HOME" source="log.path"/>
+	<springProperty scope="context" name="APP_NAME"  source="spring.application.name"/>
+	<property name="PATTERN" value=" %d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%thread] [%X{requestId}] %logger{50} [%line] - %msg%n"/>
+
+	<!--
+	<conversionRule conversionWord="msg" converterClass="com.tr.cloud.log.converter.MaskConverter"/>
+    -->
+	
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${PATTERN}</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<appender name="FILE_INFO_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${LOG_HOME}/info-${APP_NAME}.log</file>
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>ERROR</level>
+			<onMatch>DENY</onMatch>
+			<onMismatch>ACCEPT</onMismatch>
+		</filter>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${LOG_HOME}/info-${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+			<maxHistory>180</maxHistory>
+			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<maxFileSize>50MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+		</rollingPolicy>
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${PATTERN}</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<appender name="FILE_ERROR_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${LOG_HOME}/error-${APP_NAME}.log</file>
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>ERROR</level>
+			<onMatch>ACCEPT</onMatch>
+			<onMismatch>DENY</onMismatch>
+		</filter>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${LOG_HOME}/error-${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+			<maxHistory>180</maxHistory>
+			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<maxFileSize>50MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+		</rollingPolicy>
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${PATTERN}</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<root level="INFO">
+		<appender-ref ref="STDOUT" />
+		<appender-ref ref="FILE_INFO_LOG" />
+		<appender-ref ref="FILE_ERROR_LOG" />
+	</root>
+<!--	<springProfile name="dev|test|test2">-->
+<!--		<root level="INFO">-->
+<!--			<appender-ref ref="STDOUT" />-->
+<!--		</root>-->
+<!--	</springProfile>-->
+</configuration>

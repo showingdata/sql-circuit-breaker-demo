@@ -3,7 +3,6 @@ package io.github.showingdata.sql.circuit.breaker.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.showingdata.sql.circuit.breaker.entity.Order;
 import io.github.showingdata.sql.circuit.breaker.service.OrderService;
-import io.github.showingdata.starter.framework.circuitbreaker.SqlCircuitBreakerException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,6 +25,9 @@ import java.util.Map;
  *     - 若正常：RECOVERED，熔断解除
  *  5. GET /demo/slow-bypass?seconds=3 → ThreadLocal 覆盖超时为 10s，不触发熔断
  *  6. GET /demo/status-query      → 方法级注解超时 5s，不受接口级 1s 限制
+ *
+ * 熔断快速失败由 {@link io.github.showingdata.sql.circuit.breaker.handler.GlobalExceptionHandler}
+ * 统一处理：返回 503 + circuitKey + msg，并打印业务调用栈。
  *
  *
  *  ──────┬────────────────────────────────────┬──────────────────────────────────────────────────────────┐
@@ -60,21 +62,12 @@ public class DemoController {
     @GetMapping("/slow")
     public ResponseEntity<Map<String, Object>> triggerSlow(@RequestParam(defaultValue = "3") int seconds) {
         long start = System.currentTimeMillis();
+        orderService.simulateSlowQuery(seconds);
         Map<String, Object> result = new HashMap<>();
-        try {
-            orderService.simulateSlowQuery(seconds);
-            result.put("status", "success");
-            result.put("cost", System.currentTimeMillis() - start + "ms");
-            result.put("msg", "查询完成（未触发熔断，检查日志是否有 TIMEOUT）");
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            result.put("status", "circuit_open");
-            result.put("cost", System.currentTimeMillis() - start + "ms");
-            result.put("msg", "熔断器已打开，快速失败！SQL 未发送到 DB");
-            result.put("circuitKey", e.getCircuitKey());
-            log.warn("[Demo] 请求被熔断拦截: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "查询完成（未触发熔断，检查日志是否有 TIMEOUT）");
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -83,19 +76,13 @@ public class DemoController {
     @GetMapping("/list")
     public ResponseEntity<Map<String, Object>> listOrders() {
         long start = System.currentTimeMillis();
+        List<Order> orders = orderService.listAll();
         Map<String, Object> result = new HashMap<>();
-        try {
-            List<Order> orders = orderService.listAll();
-            result.put("status", "success");
-            result.put("cost", System.currentTimeMillis() - start + "ms");
-            result.put("count", orders.size());
-            result.put("data", orders);
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("count", orders.size());
+        result.put("data", orders);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -103,17 +90,11 @@ public class DemoController {
      */
     @GetMapping("/user/{userId}")
     public ResponseEntity<Map<String, Object>> listByUser(@PathVariable Long userId) {
+        List<Order> orders = orderService.listByUser(userId);
         Map<String, Object> result = new HashMap<>();
-        try {
-            List<Order> orders = orderService.listByUser(userId);
-            result.put("status", "success");
-            result.put("data", orders);
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("data", orders);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -122,18 +103,12 @@ public class DemoController {
     @GetMapping("/status-query")
     public ResponseEntity<Map<String, Object>> queryByStatus(
             @RequestParam(defaultValue = "0") Integer status) {
+        List<Order> orders = orderService.listByStatus(status);
         Map<String, Object> result = new HashMap<>();
-        try {
-            List<Order> orders = orderService.listByStatus(status);
-            result.put("status", "success");
-            result.put("msg", "方法级注解超时 5s，比接口级 1s 更宽松");
-            result.put("data", orders);
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("msg", "方法级注解超时 5s，比接口级 1s 更宽松");
+        result.put("data", orders);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -149,18 +124,13 @@ public class DemoController {
             orderService.simulateSqlException(1L);
             result.put("status", "success");
             return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            // 不会走到这里，SQL 异常不经过熔断器
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
         } catch (Exception e) {
             // SQL 异常直接透传到这里
             result.put("status", "sql_error");
             result.put("errorType", e.getClass().getSimpleName());
             result.put("msg", "SQL 执行异常直接透传，熔断器未介入，circuitBreaker 计数不增加");
             result.put("cause", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
-            log.error("[Demo] SQL 异常透传（非熔断）: {}", e.getMessage());
+            log.error("[Demo] SQL 异常透传（非熔断）: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
     }
@@ -171,18 +141,12 @@ public class DemoController {
     @GetMapping("/slow-bypass")
     public ResponseEntity<Map<String, Object>> triggerSlowWithBypass(@RequestParam(defaultValue = "3") int seconds) {
         long start = System.currentTimeMillis();
+        orderService.simulateSlowQueryWithLongerTimeout(seconds);
         Map<String, Object> result = new HashMap<>();
-        try {
-            orderService.simulateSlowQueryWithLongerTimeout(seconds);
-            result.put("status", "success");
-            result.put("cost", System.currentTimeMillis() - start + "ms");
-            result.put("msg", "ThreadLocal 覆盖超时 10s，" + seconds + "s 慢查询未触发熔断");
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "ThreadLocal 覆盖超时 10s，" + seconds + "s 慢查询未触发熔断");
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -205,23 +169,17 @@ public class DemoController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "3") int size,
             @RequestParam(required = false) Integer status) {
+        IPage<Order> pageResult = orderService.pageByStatus(page, size, status);
         Map<String, Object> result = new HashMap<>();
-        try {
-            IPage<Order> pageResult = orderService.pageByStatus(page, size, status);
-            result.put("status", "success");
-            result.put("current", pageResult.getCurrent());
-            result.put("size", pageResult.getSize());
-            result.put("total", pageResult.getTotal());
-            result.put("pages", pageResult.getPages());
-            result.put("records", pageResult.getRecords());
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            result.put("msg", "分页查询被熔断（COUNT 或 SELECT 超时达到阈值）");
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("current", pageResult.getCurrent());
+        result.put("size", pageResult.getSize());
+        result.put("total", pageResult.getTotal());
+        result.put("pages", pageResult.getPages());
+        result.put("records", pageResult.getRecords());
+        return ResponseEntity.ok(result);
     }
+
 
     /**
      * disableCircuitBreaker 演示：完全跳过熔断检测，穿透已 OPEN 的熔断器直达 DB。
@@ -236,18 +194,11 @@ public class DemoController {
     public ResponseEntity<Map<String, Object>> repairWithDisabledCircuitBreaker(
             @RequestParam(defaultValue = "3") int seconds) {
         long start = System.currentTimeMillis();
+        orderService.repairDataWithCircuitBreakerDisabled(seconds);
         Map<String, Object> result = new HashMap<>();
-        try {
-            orderService.repairDataWithCircuitBreakerDisabled(seconds);
-            result.put("status", "success");
-            result.put("cost", System.currentTimeMillis() - start + "ms");
-            result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
-            return ResponseEntity.ok(result);
-        } catch (SqlCircuitBreakerException e) {
-            // disableCircuitBreaker=true 时永远不会走到这里
-            result.put("status", "circuit_open");
-            result.put("circuitKey", e.getCircuitKey());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(result);
-        }
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
+        return ResponseEntity.ok(result);
     }
 }
