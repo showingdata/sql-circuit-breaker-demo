@@ -5,8 +5,10 @@ spring:
     name: circuit-breaker-demo
   datasource:
     dynamic:
-      primary: slave_1 #默认主库名为master
-      strict: false #不使用严格模式
+      # 默认主库名为master，这里表示默认使用slave_1作为主库
+      primary: slave_1
+      # 不使用严格模式
+      strict: false
       datasource:
         master:
           url: jdbc:mysql://127.0.0.1:3306/circuit_breaker_demo
@@ -21,7 +23,8 @@ spring:
 
   sql:
     init:
-      mode: always           # 启动时执行 schema.sql
+      # 启动时执行 schema.sql
+      mode: always
       schema-locations: classpath:schema.sql
 
 mybatis-plus:
@@ -71,13 +74,15 @@ sql-circuit-breaker:
     circuit-open-ms: 30000
     cache-max-size: 5000
     cache-expire-after-access-minutes: 30
+  # 指标配置
 management:
   endpoints:
     web:
       exposure:
         include: prometheus, metrics
 logging:
-  path: ./logs
+  file:
+    path: ./logs
   level:
     io.github.showingdata.sql.circuit.breaker: INFO
     org.mybatis.spring: INFO

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
 
-	<springProperty scope="context" name="LOG_HOME" source="log.path"/>
+	<springProperty scope="context" name="LOG_HOME" source="logging.file.path" defaultValue="./logs"/>
 	<springProperty scope="context" name="APP_NAME"  source="spring.application.name"/>
 	<property name="PATTERN" value=" %d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%thread] [%X{requestId}] %logger{50} [%line] - %msg%n"/>
 
@@ -55,6 +55,31 @@
 			<charset>UTF-8</charset>
 		</encoder>
 	</appender>
+
+	<!-- SQL 熔断器 SDK 专属日志文件 -->
+	<appender name="CIRCUIT_BREAKER_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${LOG_HOME}/sql-circuit-breaker.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${LOG_HOME}/sql-circuit-breaker.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+			<maxHistory>30</maxHistory>
+			<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+				<maxFileSize>50MB</maxFileSize>
+			</timeBasedFileNamingAndTriggeringPolicy>
+		</rollingPolicy>
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>${PATTERN}</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<!--
+	  SDK 日志隔离：
+	  - additivity="false" 阻止向 root 传播，避免业务主日志混入熔断事件
+	  - level=INFO 保留"熔断重置"INFO 事件，便于演示完整生命周期；生产环境可调 WARN 只看异常
+	-->
+	<logger name="io.github.showingdata.starter.framework.circuitbreaker" level="INFO" additivity="false">
+		<appender-ref ref="CIRCUIT_BREAKER_FILE"/>
+	</logger>
 
 	<root level="INFO">
 		<appender-ref ref="STDOUT" />
