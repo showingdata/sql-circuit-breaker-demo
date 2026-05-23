@@ -77,7 +77,7 @@
 	  - additivity="false" 阻止向 root 传播，避免业务主日志混入熔断事件
 	  - level=INFO 保留"熔断重置"INFO 事件，便于演示完整生命周期；生产环境可调 WARN 只看异常
 	-->
-	<logger name="io.github.showingdata.starter.framework.circuitbreaker" level="INFO" additivity="false">
+	<logger name="io.github.showingdata.starter.framework.circuitbreaker" level="INFO" additivity="true">
 		<appender-ref ref="CIRCUIT_BREAKER_FILE"/>
 	</logger>
 

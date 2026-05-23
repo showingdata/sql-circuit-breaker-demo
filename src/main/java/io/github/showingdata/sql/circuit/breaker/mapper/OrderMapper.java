@@ -26,6 +26,7 @@ public interface OrderMapper extends BaseMapper<Order> {
      * 使用 ${} 直接替换，避免 SLEEP 参数被 PreparedStatement 绑定失败。
      */
     @Select("SELECT SLEEP(${seconds})")
+    @SqlCircuitBreaker(timeoutMs = 8, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
     Integer simulateSlowQuery(@Param("seconds") int seconds);
 
     /**
@@ -51,6 +52,6 @@ public interface OrderMapper extends BaseMapper<Order> {
      * 方法级注解将 SELECT 超时放宽为 5s（接口级默认 3s），演示注解优先级。
      */
     @Select("SELECT * FROM t_order WHERE (#{status} IS NULL OR status = #{status}) ORDER BY create_time DESC")
-    @SqlCircuitBreaker(timeoutMs = 3000, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
+    //@SqlCircuitBreaker(timeoutMs = 3000, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
     IPage<Order> selectPageByStatus(IPage<Order> page, @Param("status") Integer status);
 }

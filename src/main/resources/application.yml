@@ -1,5 +1,5 @@
 server:
-  port: 8085
+  port: 8089
 spring:
   application:
     name: circuit-breaker-demo
@@ -37,8 +37,8 @@ mybatis-plus:
 # -------------------------------------------------------
 # 熔断器配置（刻意缩短时间，方便演示）
 # -------------------------------------------------------
-
 sql-circuit-breaker:
+  validate-annotations-on-startup: true
   enabled: true
   select:
     # SELECT 超时阈值（毫秒），建议 10s
@@ -49,8 +49,6 @@ sql-circuit-breaker:
     circuit-open-ms: 30000
     # 熔断状态缓存最大条目数（LRU 驱逐）
     cache-max-size: 5000
-    # 缓存无访问驱逐时间（分钟），建议 30min
-    cache-expire-after-access-minutes: 30
   insert:
     # DML 建议 5s
     timeout-ms: 5000
@@ -60,20 +58,19 @@ sql-circuit-breaker:
     circuit-open-ms: 30000
     # 熔断状态缓存最大条目数（LRU 驱逐）
     cache-max-size: 5000
-    # 缓存无访问驱逐时间（分钟），建议 30min
-    cache-expire-after-access-minutes: 30
+
   update:
     timeout-ms: 5000
     failure-threshold: 1
     circuit-open-ms: 30000
     cache-max-size: 5000
-    cache-expire-after-access-minutes: 30
+
   delete:
     timeout-ms: 3000
     failure-threshold: 1
     circuit-open-ms: 30000
     cache-max-size: 5000
-    cache-expire-after-access-minutes: 30
+
   # 指标配置
 management:
   endpoints:
@@ -84,8 +81,7 @@ logging:
   file:
     path: ./logs
   level:
-    io.github.showingdata.sql.circuit.breaker: INFO
     org.mybatis.spring: INFO
-
+    io.github.showingdata.sql.circuit.breaker: INFO
 
 
