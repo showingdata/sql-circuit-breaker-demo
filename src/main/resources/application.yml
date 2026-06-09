@@ -71,12 +71,44 @@ sql-circuit-breaker:
     circuit-open-ms: 30000
     cache-max-size: 5000
 
-  # 指标配置
+# -------------------------------------------------------
+# Spring Boot Actuator / Prometheus 指标
+# 访问地址：http://localhost:8089/actuator/prometheus
+# -------------------------------------------------------
 management:
   endpoints:
     web:
       exposure:
-        include: prometheus, metrics
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    export:
+      prometheus:
+        descriptions: false
+    enable:
+      # 默认关闭所有 meter，只保留下面显式打开的应用级基础指标。
+      all: false
+      # JVM：内存 jvm_memory_* / 缓冲区 jvm_buffer_* / GC jvm_gc_* / 线程 jvm_threads_*
+      jvm:
+        memory: true
+        buffer: true
+        gc: true
+        threads: true
+      # 磁盘：disk_*
+      disk: true
+      # 进程：process_*
+      process: true
+      # 系统：system_*
+      system: true
+      # 线程池：executor_*
+      executor: true
+    tags:
+      application: ${spring.application.name}
+      env: ${APP_ENV:local}
+      cluster: ${APP_CLUSTER:windows-local}
+
 logging:
   file:
     path: ./logs

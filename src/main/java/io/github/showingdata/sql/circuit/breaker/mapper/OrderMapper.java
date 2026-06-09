@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * 接口级熔断配置：所有 SELECT 超时阈值 3 秒（与 yml 全局一致，此处仅做演示覆盖）
  */
-//@SqlCircuitBreaker(timeoutMs = 3000)
+@SqlCircuitBreaker(timeoutMs = 3000)
 public interface OrderMapper extends BaseMapper<Order> {
 
     /**
@@ -52,6 +52,6 @@ public interface OrderMapper extends BaseMapper<Order> {
      * 方法级注解将 SELECT 超时放宽为 5s（接口级默认 3s），演示注解优先级。
      */
     @Select("SELECT * FROM t_order WHERE (#{status} IS NULL OR status = #{status}) ORDER BY create_time DESC")
-    //@SqlCircuitBreaker(timeoutMs = 3000, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
+    @SqlCircuitBreaker(timeoutMs = 3000, failureThreshold = 1, circuitOpenMs = 30000, disableCircuitBreaker = false)
     IPage<Order> selectPageByStatus(IPage<Order> page, @Param("status") Integer status);
 }
