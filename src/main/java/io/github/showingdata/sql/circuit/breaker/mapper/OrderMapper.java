@@ -22,6 +22,12 @@ public interface OrderMapper extends BaseMapper<Order> {
     List<Order> selectByUserId(@Param("userId") Long userId);
 
     /**
+     * 根据组件获取
+     */
+    @Select("SELECT * FROM t_order WHERE id = #{id}")
+    Order getById(@Param("id") Long id);
+
+    /**
      * 模拟慢查询：通过 MySQL SLEEP 函数让 SQL 执行指定秒数，触发超时熔断。
      * 使用 ${} 直接替换，避免 SLEEP 参数被 PreparedStatement 绑定失败。
      */
