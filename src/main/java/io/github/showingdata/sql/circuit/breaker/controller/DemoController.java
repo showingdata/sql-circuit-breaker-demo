@@ -201,4 +201,16 @@ public class DemoController {
         result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
         return ResponseEntity.ok(result);
     }
+
+    @GetMapping("/repair2")
+    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker(
+            @RequestParam(defaultValue = "3") int seconds) {
+        long start = System.currentTimeMillis();
+        orderService.repairDataWithCircuitBreakerDisabled(seconds);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
+        return ResponseEntity.ok(result);
+    }
 }
