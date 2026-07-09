@@ -1,0 +1,199 @@
+package io.github.showingdata.sql.circuit.breaker.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import io.github.showingdata.sql.circuit.breaker.entity.Order;
+import io.github.showingdata.sql.circuit.breaker.service.OrderService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @author chenjiang
+ * @date 2026/7/9 9:05
+ * @package io.github.showingdata.sql.circuit.breaker.controller
+ * @className Demo2Controller
+ * @description
+ */
+@Slf4j
+@RestController
+@RequestMapping("/demo2")
+@RequiredArgsConstructor
+public class Demo2Controller {
+    private final OrderService orderService;
+
+    /**
+     * 触发慢查询：seconds > 1 时必然超时，第一次 CIRCUIT_OPEN，后续 FAST_FAIL
+     */
+    @GetMapping("/slow")
+    public ResponseEntity<Map<String, Object>> triggerSlow(@RequestParam(defaultValue = "3") int seconds) {
+        long start = System.currentTimeMillis();
+        orderService.simulateSlowQuery(seconds);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "查询完成（未触发熔断，检查日志是否有 TIMEOUT）");
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 正常查询：SQL 指纹不同，有独立熔断状态，不受 /slow 熔断影响
+     */
+    @GetMapping("/list")
+    public ResponseEntity<Map<String, Object>> listOrders() {
+        long start = System.currentTimeMillis();
+        List<Order> orders = orderService.listAll();
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("count", orders.size());
+        result.put("data", orders);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 按用户查询：演示接口级注解，超时 1s
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Map<String, Object>> listByUser(@PathVariable Long userId) {
+        List<Order> orders = orderService.listByUser(userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("data", orders);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 方法级注解覆盖：selectByStatus 单独配置超时 5s，演示注解优先级
+     */
+    @GetMapping("/status-query")
+    public ResponseEntity<Map<String, Object>> queryByStatus(
+            @RequestParam(defaultValue = "0") Integer status) {
+        List<Order> orders = orderService.listByStatus(status);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("msg", "方法级注解超时 5s，比接口级 1s 更宽松");
+        result.put("data", orders);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 模拟 SQL 异常（表不存在）：
+     * - 拦截器 catch(Throwable t) 直接透传，不触发熔断、不增加超时计数
+     * - 连续调用多次，/demo/list 等正常接口不受任何影响
+     * - 返回的是原始 BadSqlGrammarException，不是 SqlCircuitBreakerException
+     */
+    @GetMapping("/sql-error")
+    public ResponseEntity<Map<String, Object>> triggerSqlError() {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            orderService.simulateSqlException(1L);
+            result.put("status", "success");
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            // SQL 异常直接透传到这里
+            result.put("status", "sql_error");
+            result.put("errorType", e.getClass().getSimpleName());
+            result.put("msg", "SQL 执行异常直接透传，熔断器未介入，circuitBreaker 计数不增加");
+            result.put("cause", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+            log.error("[Demo] SQL 异常透传（非熔断）: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+
+    /**
+     * ThreadLocal 覆盖演示：临时将超时放宽至 10s，相同慢查询不触发熔断
+     */
+    @GetMapping("/slow-bypass")
+    public ResponseEntity<Map<String, Object>> triggerSlowWithBypass(@RequestParam(defaultValue = "3") int seconds) {
+        long start = System.currentTimeMillis();
+        orderService.simulateSlowQueryWithLongerTimeout(seconds);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "ThreadLocal 覆盖超时 10s，" + seconds + "s 慢查询未触发熔断");
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 分页查询演示。
+     *
+     * MP 分页原理：每次分页请求会向 DB 发送两条 SQL——
+     *   ① SELECT COUNT(*) FROM t_order WHERE ...        （总数，独立熔断 Key）
+     *   ② SELECT * FROM t_order WHERE ... LIMIT ?,?     （数据，独立熔断 Key）
+     * 两条 SQL 的指纹不同，各自独立计入超时次数，互不影响。
+     * 注意：COUNT 失败不会阻止数据 SQL 执行（两者串行，COUNT 先行）。
+     *
+     * 测试步骤：
+     *  1. GET /demo/page?page=1&size=3              → 第1页，每页3条
+     *  2. GET /demo/page?page=2&size=3              → 第2页
+     *  3. GET /demo/page?page=1&size=5&status=1     → 过滤已支付订单，每页5条
+     *  4. GET /demo/page?page=99&size=3             → 超出范围，返回空 records
+     */
+    @GetMapping("/page")
+    public ResponseEntity<Map<String, Object>> pageOrders(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "3") int size,
+            @RequestParam(required = false) Integer status) {
+        IPage<Order> pageResult = orderService.pageByStatus(page, size, status);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("current", pageResult.getCurrent());
+        result.put("size", pageResult.getSize());
+        result.put("total", pageResult.getTotal());
+        result.put("pages", pageResult.getPages());
+        result.put("records", pageResult.getRecords());
+        return ResponseEntity.ok(result);
+    }
+
+
+    /**
+     * disableCircuitBreaker 演示：完全跳过熔断检测，穿透已 OPEN 的熔断器直达 DB。
+     *
+     * 推荐测试步骤：
+     *  1. GET /demo/slow?seconds=3         → 触发熔断，熔断器变 OPEN
+     *  2. GET /demo/slow?seconds=3         → 立即 FAST_FAIL（证明熔断器已开启）
+     *  3. GET /demo/repair?seconds=3       → 正常执行 3s 后返回（穿透了 OPEN 的熔断器）
+     *  4. GET /demo/slow?seconds=3         → 仍然 FAST_FAIL（repair 不影响熔断状态）
+     */
+    @GetMapping("/repair")
+    public ResponseEntity<Map<String, Object>> repairWithDisabledCircuitBreaker(
+            @RequestParam(defaultValue = "3") int seconds) {
+        long start = System.currentTimeMillis();
+        orderService.repairDataWithCircuitBreakerDisabled(seconds);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/repair2")
+    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker(
+            @RequestParam(defaultValue = "3") int seconds) {
+        long start = System.currentTimeMillis();
+        orderService.repairDataWithCircuitBreakerDisabled(seconds);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/repair3")
+    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker3(
+            @RequestParam(defaultValue = "3") int seconds) {
+        long start = System.currentTimeMillis();
+        orderService.repairDataWithCircuitBreakerDisabled(seconds);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("cost", System.currentTimeMillis() - start + "ms");
+        result.put("msg", "disableCircuitBreaker=true，穿透熔断器直接执行，SQL 耗时 " + seconds + "s，失败计数不增加");
+        return ResponseEntity.ok(result);
+    }
+}
