@@ -72,42 +72,69 @@ sql-circuit-breaker:
     cache-max-size: 5000
 
 # -------------------------------------------------------
-# Spring Boot Actuator / Prometheus 指标
+# Spring Boot Actuator / Prometheus 指标配置
 # 访问地址：http://localhost:8089/actuator/prometheus
+# Metricbeat 会定期抓取该端点的指标数据并写入 Elasticsearch
 # -------------------------------------------------------
 management:
+  server:
+    port: 8089 # 独立管理端口  开发测试等同于server.port 线上生产环境独立分开
   endpoints:
     web:
       exposure:
+        # 暴露的端点：健康检查、应用信息、原始指标、Prometheus 格式指标
         include: health,info,metrics,prometheus
   endpoint:
     health:
+      # 健康检查详情：仅在授权时显示（避免泄露内部信息）
       show-details: when_authorized
   metrics:
     export:
       prometheus:
+        # 关闭 HELP 描述：Metricbeat 7.10.2 对部分转义字符兼容性较差，关闭后不影响指标值采集
         descriptions: false
     enable:
-      # 默认关闭所有 meter，只保留下面显式打开的应用级基础指标。
+      # 默认关闭所有 meter，只保留下面显式打开的应用级基础指标，避免噪音和存储膨胀
       all: false
-      # JVM：内存 jvm_memory_* / 缓冲区 jvm_buffer_* / GC jvm_gc_* / 线程 jvm_threads_*
+      # JVM 指标：内存 jvm_memory_* / 缓冲区 jvm_buffer_* / GC jvm_gc_* / 线程 jvm_threads_*
       jvm:
-        memory: true
-        buffer: true
-        gc: true
-        threads: true
-      # 磁盘：disk_*
+        memory: true    # 堆/非堆内存使用情况
+        buffer: true    # 直接内存缓冲区
+        gc: true        # GC 次数和暂停时间
+        threads: true   # 线程数（活跃/守护）
+      # 磁盘：disk_* （磁盘空间使用）
       disk: true
-      # 进程：process_*
+      # 进程：process_* （进程 CPU 使用率、启动时间）
       process: true
-      # 系统：system_*
+      # 系统：system_* （系统 CPU 使用率、文件描述符）
       system: true
-      # 线程池：executor_*
+      # 线程池：executor_* （线程池队列、活跃线程数）
       executor: true
+      # HTTP 服务端请求指标：http_server_requests_seconds_* （QPS/延迟/错误率）
+      # 适用于 A 系统（无 APM）；B 系统（有 APM）应关闭此项避免重复采集
+      http:
+        server:
+          requests: true
+    # 通用标签：会附加到所有指标上，用于 Kibana 过滤和聚合
     tags:
-      application: ${spring.application.name}
+      application: ${spring.application.name}  # 应用名（区分不同应用）
+      # 环境标识：默认值 "local" 仅适合本地开发，生产环境通过环境变量注入 dev/test/prod
       env: ${APP_ENV:local}
+      # 集群标识：默认值 "windows-local" 仅用于测试演示，生产环境需配置实际集群标识（如 bj-01 / sh-02）
       cluster: ${APP_CLUSTER:windows-local}
+    # HTTP 请求延迟分布配置
+    distribution:
+      percentiles-histogram:
+        # 不生成 histogram bucket：Kibana 无法使用 _bucket 数据计算分位数，开启只会增加存储体积
+        http.server.requests: false
+      percentiles:
+        # 客户端分位数（单实例口径）：p50/p90/p95/p99，用于观察单个实例的延迟分布
+        # 注意：不能跨多个实例聚合分位数，仅供单实例参考
+        http.server.requests: 0.5,0.9,0.95,0.99
+      slo:
+        # SLO 桶边界：用于统计落在各延迟区间的请求占比（如 <100ms、100-300ms 等）
+        http.server.requests: 100ms,300ms,500ms,1s,2s,5s
+
 
 logging:
   file:
@@ -115,5 +142,68 @@ logging:
   level:
     org.mybatis.spring: INFO
     io.github.showingdata.sql.circuit.breaker: INFO
+
+
+# 公司 base-framework 统一前缀：总开关 enabled（默认关闭，须显式开启）与全部配置都在此前缀下，与 es-temp 同前缀树。
+xw-framework:
+  components:
+    base-framework:
+      es-circuit-breaker:
+        enabled: false
+        dimensions:
+          global:
+            slow-threshold-ms: 5000
+            failure-threshold: 10
+            fast-fail-log-throttle-ms: 5000
+            circuit-open-ms: 10000        # <= operation 的 circuit-open-ms（启动校验强制 global 最宽松/恢复最快）
+          operation:
+            enabled: false
+            rules:
+              search:
+                slow-threshold-ms: 200
+                failure-threshold: 3
+                circuit-open-ms: 10000    # 与 global 相等也合法（校验是严格 <），允许细维度比 global 更紧
+              get:
+                slow-threshold-ms: 300
+                failure-threshold: 3
+                circuit-open-ms: 10000
+              index:
+                slow-threshold-ms: 1000
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              update:
+                slow-threshold-ms: 1000
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              delete:
+                slow-threshold-ms: 1000
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              bulk:
+                slow-threshold-ms: 2000
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              mget:
+                slow-threshold-ms: 800
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              msearch:
+                slow-threshold-ms: 1000
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              scroll:
+                slow-threshold-ms: 1000
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              count:
+                slow-threshold-ms: 800
+                failure-threshold: 3
+                circuit-open-ms: 15000
+              exists:
+                slow-threshold-ms: 300
+                failure-threshold: 3
+                circuit-open-ms: 10000
+        registry:
+          max-size-per-dimension: 10000
 
 

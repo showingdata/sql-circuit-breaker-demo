@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -122,24 +123,21 @@ public class Demo2Controller {
 
     /**
      * 分页查询演示。
-     *
+     * <p>
      * MP 分页原理：每次分页请求会向 DB 发送两条 SQL——
-     *   ① SELECT COUNT(*) FROM t_order WHERE ...        （总数，独立熔断 Key）
-     *   ② SELECT * FROM t_order WHERE ... LIMIT ?,?     （数据，独立熔断 Key）
+     * ① SELECT COUNT(*) FROM t_order WHERE ...        （总数，独立熔断 Key）
+     * ② SELECT * FROM t_order WHERE ... LIMIT ?,?     （数据，独立熔断 Key）
      * 两条 SQL 的指纹不同，各自独立计入超时次数，互不影响。
      * 注意：COUNT 失败不会阻止数据 SQL 执行（两者串行，COUNT 先行）。
-     *
+     * <p>
      * 测试步骤：
-     *  1. GET /demo/page?page=1&size=3              → 第1页，每页3条
-     *  2. GET /demo/page?page=2&size=3              → 第2页
-     *  3. GET /demo/page?page=1&size=5&status=1     → 过滤已支付订单，每页5条
-     *  4. GET /demo/page?page=99&size=3             → 超出范围，返回空 records
+     * 1. GET /demo/page?page=1&size=3              → 第1页，每页3条
+     * 2. GET /demo/page?page=2&size=3              → 第2页
+     * 3. GET /demo/page?page=1&size=5&status=1     → 过滤已支付订单，每页5条
+     * 4. GET /demo/page?page=99&size=3             → 超出范围，返回空 records
      */
     @GetMapping("/page")
-    public ResponseEntity<Map<String, Object>> pageOrders(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "3") int size,
-            @RequestParam(required = false) Integer status) {
+    public ResponseEntity<Map<String, Object>> pageOrders(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "3") int size, @RequestParam(required = false) Integer status) {
         IPage<Order> pageResult = orderService.pageByStatus(page, size, status);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "success");
@@ -154,16 +152,15 @@ public class Demo2Controller {
 
     /**
      * disableCircuitBreaker 演示：完全跳过熔断检测，穿透已 OPEN 的熔断器直达 DB。
-     *
+     * <p>
      * 推荐测试步骤：
-     *  1. GET /demo/slow?seconds=3         → 触发熔断，熔断器变 OPEN
-     *  2. GET /demo/slow?seconds=3         → 立即 FAST_FAIL（证明熔断器已开启）
-     *  3. GET /demo/repair?seconds=3       → 正常执行 3s 后返回（穿透了 OPEN 的熔断器）
-     *  4. GET /demo/slow?seconds=3         → 仍然 FAST_FAIL（repair 不影响熔断状态）
+     * 1. GET /demo/slow?seconds=3         → 触发熔断，熔断器变 OPEN
+     * 2. GET /demo/slow?seconds=3         → 立即 FAST_FAIL（证明熔断器已开启）
+     * 3. GET /demo/repair?seconds=3       → 正常执行 3s 后返回（穿透了 OPEN 的熔断器）
+     * 4. GET /demo/slow?seconds=3         → 仍然 FAST_FAIL（repair 不影响熔断状态）
      */
     @GetMapping("/repair")
-    public ResponseEntity<Map<String, Object>> repairWithDisabledCircuitBreaker(
-            @RequestParam(defaultValue = "3") int seconds) {
+    public ResponseEntity<Map<String, Object>> repairWithDisabledCircuitBreaker(@RequestParam(defaultValue = "3") int seconds) {
         long start = System.currentTimeMillis();
         orderService.repairDataWithCircuitBreakerDisabled(seconds);
         Map<String, Object> result = new HashMap<>();
@@ -174,8 +171,7 @@ public class Demo2Controller {
     }
 
     @GetMapping("/repair2")
-    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker(
-            @RequestParam(defaultValue = "3") int seconds) {
+    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker(@RequestParam(defaultValue = "3") int seconds) {
         long start = System.currentTimeMillis();
         orderService.repairDataWithCircuitBreakerDisabled(seconds);
         Map<String, Object> result = new HashMap<>();
@@ -186,8 +182,7 @@ public class Demo2Controller {
     }
 
     @GetMapping("/repair3")
-    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker3(
-            @RequestParam(defaultValue = "3") int seconds) {
+    public ResponseEntity<Map<String, Object>> testRepairWithDisabledCircuitBreaker3(@RequestParam(defaultValue = "3") int seconds) {
         long start = System.currentTimeMillis();
         orderService.repairDataWithCircuitBreakerDisabled(seconds);
         Map<String, Object> result = new HashMap<>();
